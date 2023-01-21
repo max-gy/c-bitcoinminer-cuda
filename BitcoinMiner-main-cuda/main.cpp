@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-
+//#include "sha256.h"
 #include "miner.h"
 #include "util.h"
 
@@ -25,6 +25,9 @@ int main()
     
     //hashblock((uint32_t)2083236893, result);
     hashblock(nonce, version, prevhash, merkle_root, time, nbits, result);
+
+
+    std::cout << "Block hash:" << std::endl;
 
     for(int i = 0; i < 8; i++)
         result[i] = Reverse32(result[i]);

@@ -1,7 +1,6 @@
 #include <iostream>
 #include <iomanip>
 #include <string.h>
-#include <stdio.h>
 
 void print_bytes(const unsigned char *data, size_t dataLen, bool format = true) {
     for(size_t i = 0; i < dataLen; ++i) {

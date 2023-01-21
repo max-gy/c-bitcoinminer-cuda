@@ -1,12 +1,10 @@
 #include <stdint.h>
 #include <iostream>
 #include <chrono>
-#include <stdio.h>
-
+#include "mainCuda.h"
 
 #include "util.h"
-#include "sha256.h"
-
+//#include "sha256.h"
 
 // Converts bits to a 256-bit value that we can compare our hash against
 void bits_to_difficulty(uint32_t bits, uint32_t* difficulty)
@@ -50,16 +48,25 @@ void hashblock(uint32_t nonce, char* version, char* prevhash,
 
     uint32_t hash0[8];
 
-    std::cout << "Before CUDA " << std::endl;
+    std::cout << "\n Run hash input\n";
+    for (int i=0;i<20;i++) {
+        std::cout << blockheader[i];
+    }
+    
 
-    hash_CUDA(*blockheader, 640, hash0);
+    run_hash(blockheader, 640, hash0);
 
-    hash_CUDA(*hash0, 256, result);
-
+    std::cout << "\n Run hash output\n";
+    for (int i=0;i<8;i++) {
+        std::cout << hash0[i];
+    }
+    
     //hash(blockheader, 640, hash0);
 
+    run_hash(hash0, 256, result);
+
     //hash(hash0, 256, result);
- 
+
     //print_bytes((unsigned char*)result, 32);
 }
 

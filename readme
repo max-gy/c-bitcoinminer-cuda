@@ -1,7 +1,6 @@
 # this is a btc miner for nvidia xavier
 
-
-nvcc -o main.out main.cpp miner.cpp util.cpp sha256.cu
+nvcc -o main.out main.cpp miner.cpp util.cpp mainCuda.cu
 
 export LD_LIBRARY_PATH=/usr/local/cuda/lib
 export PATH=$PATH:/usr/local/cuda/bin
