@@ -94,11 +94,11 @@ uint32_t mineblock(uint32_t noncestart, char* version, char* prevhash,
 
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-    if(true)
+    if(true) // only once
     {
         nonce++;
 
-        __hashblock(nonce, version, prevhash, merkle_root, time, nbits, hash);
+        __hashblock(nonce, version, prevhash, merkle_root, time, nbits); //,hash);;
 
         for(int i = 0; i < 8; i++)
         {
@@ -111,12 +111,6 @@ uint32_t mineblock(uint32_t noncestart, char* version, char* prevhash,
                 break;
             // And if they're equal, we keep going!
         }
-
-        std::cout << "\n Run nonce\n";
-        std::cout << nonce;
-        std::cout << "\n Run nonce start\n";
-        std::cout << noncestart;
-        
     
         if(((nonce - noncestart) % 10000) == 0 && nonce != noncestart)
         {

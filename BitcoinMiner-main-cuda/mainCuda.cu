@@ -10,9 +10,11 @@
 #include <unistd.h>
 //#include <cuda_runtime.h>
 #include "sha256cuda.h"
-
+#include "util.h"
+#include "miner.h"
 #include <dirent.h>
 #include <ctype.h>
+#include <chrono>
 
 #include "/usr/local/cuda-11.4/targets/aarch64-linux/include/cuda_runtime.h"
 #include "/usr/local/cuda-11.4/targets/aarch64-linux/include/device_launch_parameters.h"
@@ -122,9 +124,255 @@ __global__ void sha256_cuda_hash(uint32_t* result_H) {
 	return;
 }
 
-void hashblock(uint32_t nonce, char* version, char* prevhash, 
-	char* merkle_root, char* time, char* nbits, uint32_t* result)
+__global__ void sha256_cuda_hash_full(uint32_t* result_H) {
+
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	uint32_t H_0[8] = { 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 };
+
+    uint32_t K[64] = {0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+    0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+    0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+    0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+    0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+	
+
+	//result_H[index] = index;
+
+
+	uint32_t blockheader[20];
+	for (int bi=0;bi<19;bi++) blockheader[bi] = dev_blockheader[bi];
+	blockheader[19] = dev_nonce[0] + index;
+    //*(blockheader + 19) = dev_nonce[0] + index;
+
+    //print_bytes((unsigned char*)blockheader, 80);
+
+
+
+    for(int i = 0; i < 20; i++)
+        blockheader[i] = __Reverse32(blockheader[i]);
+
+	
+    uint32_t hash0[8];
+
+	uint32_t outputlocation[8];
+	uint32_t H[32][8];
+
+	for (int hash_round = 1;hash_round<3;hash_round++) 
+	{
+		
+		
+		int bitlength = 640;
+		uint32_t* input = blockheader;
+		if (hash_round == 2) {
+			bitlength = 256;
+			input = outputlocation;
+		}	
+
+		
+
+		int wordlength = bitlength / 32 + 1;
+		int k = (512 * 512 - bitlength - 1) % 512;
+		uint32_t message[10000] = {};
+
+		for(int i = 0; i < wordlength; i++)
+			message[i] = input[i];
+
+		if(bitlength % 32 != 0)
+			message[bitlength / 32] = message[bitlength / 32] | (1 << (32 - 1 - bitlength % 32));
+		else
+			message[bitlength / 32] = 1 << 31;
+
+		uint32_t rounds;
+
+		// Assuming our data isn't bigger than 2^32 bits long... which it won't be for a block hash.
+		if(wordlength % 16 == 0 || wordlength % 16 == 15)
+		{
+			message[wordlength + 15 + 16 - wordlength % 16] = bitlength;
+			rounds = wordlength / 16 + 2;
+		}
+		else
+		{
+			message[wordlength + 15 - wordlength % 16] = bitlength;
+			rounds = wordlength / 16 + 1;
+		}
+
+		
+			
+		uint32_t M[32][16];
+
+		for(int i = 0; i < 16; i++)
+			for(int j = 0; j <= rounds; j++)
+				M[j][i] = message[i + j * 16];
+
+
+		for(int i = 0; i < 8; i++)
+			H[0][i] = H_0[i];
+
+
+		
+		// Here our hash function rounds actually start.
+		for(int i = 1; i <= rounds; i++)
+		{
+
+			
+			uint32_t a = H[i-1][0];
+			uint32_t b = H[i-1][1];
+			uint32_t c = H[i-1][2];
+			uint32_t d = H[i-1][3];
+			uint32_t e = H[i-1][4];
+			uint32_t f = H[i-1][5];
+			uint32_t g = H[i-1][6];
+			uint32_t h = H[i-1][7];
+
+			uint32_t W[64];
+
+			
+			for(int j = 0; j < 64; j++)
+			{
+				uint32_t ch = Ch(e, f, g);
+				uint32_t maj = Maj(a, b, c);
+				uint32_t Sig0 = Sig0f(a);
+				uint32_t Sig1 = Sig1f(e);
+
+				if(j < 16)
+					W[j] = M[i-1][j];
+				else
+					W[j] = sig1(W[j-2]) + W[j-7] + sig0(W[j-15]) + W[j-16];
+				
+				
+				uint32_t T1 = h + Sig1 + ch + K[j] + W[j];
+				uint32_t T2 = Sig0 + maj;
+				h = g;
+				g = f;
+				f = e;
+				e = d + T1;
+				d = c;
+				c = b;
+				b = a;
+				a = T1 + T2;
+				
+			}
+
+			H[i][0] = a + H[i-1][0];
+			H[i][1] = b + H[i-1][1];
+			H[i][2] = c + H[i-1][2];
+			H[i][3] = d + H[i-1][3];
+			H[i][4] = e + H[i-1][4];
+			H[i][5] = f + H[i-1][5];
+			H[i][6] = g + H[i-1][6];
+			H[i][7] = h + H[i-1][7];
+
+		
+				
+		}
+
+		for(int oi = 0; oi < 8; oi++)
+			outputlocation[oi] = H[rounds][oi];
+
+		
+	}
+
+	int solved = 0;
+	for(int i = 0; i < 8; i++)
+	{
+		if(outputlocation[7-i] < dev_difficulty[i])
+		{
+			solved = 1;
+
+		}
+		else if(outputlocation[7-i] > dev_difficulty[i])
+			break;
+		// And if they're equal, we keep going!
+	}
+	
+	result_H[index] = solved;
+
+	    //for(int i = 0; i < 8; i++)
+       // outputlocation[i] = H[rounds][i];
+
+	
+    /*std::cout << "\n Run hash input\n";
+	for (int y=0;y<32;y++) 
+        for (int z=0;z<8;z++) 
+			std::cout << H[y][z] << " "; */
+	return;
+
+ 
+}
+
+
+void __hashblock(uint32_t _nonce, char* version, char* prevhash, 
+	char* merkle_root, char* time, char* nbits)
 {
+
+
+	uint32_t nonce[1];
+	nonce[0] = _nonce;
+
+	uint32_t difficulty[8];
+    uint32_t bits[1];
+    hexstr_to_intarray(nbits, bits);
+    bits_to_difficulty(*bits, difficulty);
+
+	int solved = 0;
+	while (!solved) {
+
+		uint32_t blockheader[20];
+
+		hexstr_to_intarray(version, blockheader);
+		hexstr_to_intarray(prevhash, blockheader + 1);
+		hexstr_to_intarray(merkle_root, blockheader + 9);
+		hexstr_to_intarray(time, blockheader + 17);
+		hexstr_to_intarray(nbits, blockheader + 18);
+		*(blockheader + 19) = nonce[0];
+
+		uint32_t * cuda_result_nonce = 0;
+		uint32_t result_nonce[1024*1024];
+		for (int bi = 0;bi<1024*1024;bi++) result_nonce[bi] = 0;
+
+		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
+		checkCudaErrors(cudaMemcpyToSymbol(dev_nonce, nonce, sizeof(nonce), 0, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpyToSymbol(dev_blockheader, blockheader, sizeof(blockheader), 0, cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpyToSymbol(dev_difficulty, difficulty, sizeof(difficulty), 0, cudaMemcpyHostToDevice));
+
+
+		cudaMalloc(&cuda_result_nonce, sizeof(result_nonce));
+
+		
+
+		sha256_cuda_hash_full <<< 1024, 1024 >>> (cuda_result_nonce);
+
+		cudaMemcpy(result_nonce,cuda_result_nonce,sizeof(result_nonce),cudaMemcpyDeviceToHost); 
+
+		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+		long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		float hashrate = 1024*1024*1000 / (float)duration;
+		std::cout << "Currently mining at " << hashrate << " hashes / second" << std::endl;
+
+
+		
+		std::cout << "finished cuda \n";
+		for (int bi = 0;bi<1024*1024;bi++) {
+			nonce[0]++;
+			if (result_nonce[bi] == 1) solved = 1;
+		};
+
+
+	}
+
 
 
 }

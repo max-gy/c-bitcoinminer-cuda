@@ -64,6 +64,22 @@ __constant__ uint32_t dev_H[32][8];
 __constant__ uint32_t dev_M[32][16];
 
 
+__constant__ uint32_t dev_nonce[1];
+__constant__ uint32_t dev_difficulty[8];
+
+__constant__ uint32_t dev_blockheader[20];
+
+
+
+__device__ uint32_t __Reverse32(uint32_t value)
+{
+    return (((value & 0x000000FF) << 24) |
+            ((value & 0x0000FF00) <<  8) |
+            ((value & 0x00FF0000) >>  8) |
+            ((value & 0xFF000000) >> 24));
+}
+
+
 char * hash_to_string(BYTE * buff) {
 	char * string = (char *)malloc(70);
 	int k, i;
