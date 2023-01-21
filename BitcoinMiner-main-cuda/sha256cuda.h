@@ -3,6 +3,7 @@
 
 
 /****************************** MACROS ******************************/
+/*
 #define SHA256_BLOCK_SIZE 32            // SHA256 outputs a 32 byte digest
 
 #define ROTLEFT(a,b) (((a) << (b)) | ((a) >> (32-(b))))
@@ -15,6 +16,7 @@
 #define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
 #define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
 
+*/
 #define checkCudaErrors(x) \
 { \
     cudaGetLastError(); \
@@ -57,6 +59,9 @@ static const WORD host_k[64] = {
 
 /*********************** FUNCTION DECLARATIONS **********************/
 
+
+__constant__ uint32_t dev_H[32][8];
+__constant__ uint32_t dev_M[32][16];
 
 
 char * hash_to_string(BYTE * buff) {
@@ -114,17 +119,17 @@ __device__ int Ch(int x, int y, int z)
     return ((x & y) ^ (~x & z));
 }
 
-__device__ int Maj(int x, int y, int z)
+__device__  int Maj(int x, int y, int z)
 {
     return ((x & y) ^ (x & z) ^ (y & z));
 }
 
-__device__ int Sig0f(int x)
+__device__  int Sig0f(int x)
 {
     return(rotateInt(x, 2) ^ rotateInt(x, 13) ^ rotateInt(x, 22));
 }
 
-__device__ int Sig1f(int x)
+__device__  int Sig1f(int x)
 {
     return(rotateInt(x, 6) ^ rotateInt(x, 11) ^ rotateInt(x,25));
 }
@@ -139,11 +144,9 @@ __device__ uint32_t sig1(uint32_t x)
     return(rotateInt(x, 17) ^ rotateInt(x, 19) ^ (x >> 10));
 }
 
-
-__device__ void cudahash(uint32_t *input, int bitlength, uint32_t *outputlocation)
+/*
+void cudahash(uint32_t H[][8], uint32_t M[][16], uint32_t rounds, uint32_t *outputlocation)
 {
-    uint32_t H_0[8] = { 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 };
-
     uint32_t K[64] = {0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
     0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -160,43 +163,6 @@ __device__ void cudahash(uint32_t *input, int bitlength, uint32_t *outputlocatio
     0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
     0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
-
-    int wordlength = bitlength / 32 + 1;
-    int k = (512 * 512 - bitlength - 1) % 512;
-    uint32_t message[10000] = {};
-
-    for(int i = 0; i < wordlength; i++)
-        message[i] = input[i];
-
-    if(bitlength % 32 != 0)
-        message[bitlength / 32] = message[bitlength / 32] | (1 << (32 - 1 - bitlength % 32));
-    else
-        message[bitlength / 32] = 1 << 31;
-    
-    uint32_t rounds;
-
-    // Assuming our data isn't bigger than 2^32 bits long... which it won't be for a block hash.
-    if(wordlength % 16 == 0 || wordlength % 16 == 15)
-    {
-        message[wordlength + 15 + 16 - wordlength % 16] = bitlength;
-        rounds = wordlength / 16 + 2;
-    }
-    else
-    {
-        message[wordlength + 15 - wordlength % 16] = bitlength;
-        rounds = wordlength / 16 + 1;
-    }
-        
-    uint32_t M[32][16];
-
-    for(int i = 0; i < 16; i++)
-        for(int j = 0; j <= rounds; j++)
-            M[j][i] = message[i + j * 16];
-    
-    uint32_t H[32][8];
-
-    for(int i = 0; i < 8; i++)
-        H[0][i] = H_0[i];
 
     // Here our hash function rounds actually start.
     for(int i = 1; i <= rounds; i++)
@@ -249,5 +215,6 @@ __device__ void cudahash(uint32_t *input, int bitlength, uint32_t *outputlocatio
     for(int i = 0; i < 8; i++)
         outputlocation[i] = H[rounds][i];
 }
+*/
 
 #endif   // SHA256_H

@@ -32,6 +32,8 @@ void bits_to_difficulty(uint32_t bits, uint32_t* difficulty)
 void hashblock(uint32_t nonce, char* version, char* prevhash, 
     char* merkle_root, char* time, char* nbits, uint32_t* result)
 {
+
+
     uint32_t blockheader[20];
 
     hexstr_to_intarray(version, blockheader);
@@ -48,22 +50,27 @@ void hashblock(uint32_t nonce, char* version, char* prevhash,
 
     uint32_t hash0[8];
 
+    run_hash(blockheader, 640, hash0);
+
+    run_hash(hash0, 256, result);
+
+
+/*
     std::cout << "\n Run hash input\n";
     for (int i=0;i<20;i++) {
         std::cout << blockheader[i];
     }
     
 
-    run_hash(blockheader, 640, hash0);
 
     std::cout << "\n Run hash output\n";
     for (int i=0;i<8;i++) {
         std::cout << hash0[i];
     }
-    
+    */
+
     //hash(blockheader, 640, hash0);
 
-    run_hash(hash0, 256, result);
 
     //hash(hash0, 256, result);
 
@@ -87,11 +94,11 @@ uint32_t mineblock(uint32_t noncestart, char* version, char* prevhash,
 
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-    while(true)
+    if(true)
     {
         nonce++;
 
-        hashblock(nonce, version, prevhash, merkle_root, time, nbits, hash);
+        __hashblock(nonce, version, prevhash, merkle_root, time, nbits, hash);
 
         for(int i = 0; i < 8; i++)
         {
@@ -105,6 +112,12 @@ uint32_t mineblock(uint32_t noncestart, char* version, char* prevhash,
             // And if they're equal, we keep going!
         }
 
+        std::cout << "\n Run nonce\n";
+        std::cout << nonce;
+        std::cout << "\n Run nonce start\n";
+        std::cout << noncestart;
+        
+    
         if(((nonce - noncestart) % 10000) == 0 && nonce != noncestart)
         {
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

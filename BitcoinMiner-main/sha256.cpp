@@ -156,4 +156,9 @@ void hash(uint32_t *input, int bitlength, uint32_t *outputlocation)
 
     for(int i = 0; i < 8; i++)
         outputlocation[i] = H[rounds][i];
+
+    /*std::cout << "\n Run hash input\n";
+	for (int y=0;y<32;y++) 
+        for (int z=0;z<8;z++) 
+        	std::cout << H[y][z] << " "; */
 }

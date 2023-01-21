@@ -48,7 +48,10 @@ void hashblock(uint32_t nonce, char* version, char* prevhash,
     uint32_t hash0[8];
     hash(blockheader, 640, hash0);
 
+
     hash(hash0, 256, result);
+
+
 
     //print_bytes((unsigned char*)result, 32);
 }
@@ -87,6 +90,12 @@ uint32_t mineblock(uint32_t noncestart, char* version, char* prevhash,
                 break;
             // And if they're equal, we keep going!
         }
+
+        std::cout << "\n Run nonce\n";
+        std::cout << nonce;
+        std::cout << "\n Run nonce start\n";
+        std::cout << noncestart;
+        
 
         if(((nonce - noncestart) % 10000) == 0 && nonce != noncestart)
         {
