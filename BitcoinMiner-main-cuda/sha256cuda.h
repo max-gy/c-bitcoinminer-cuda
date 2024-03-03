@@ -44,7 +44,7 @@ typedef struct {
 	WORD state[8];
 } SHA256_CTX;
 
-__constant__ WORD dev_k[64];
+__constant__ uint32_t dev_K[64];
 
 static const WORD host_k[64] = {
 	0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
@@ -68,8 +68,6 @@ __constant__ uint32_t dev_nonce[1];
 __constant__ uint32_t dev_difficulty[8];
 
 __constant__ uint32_t dev_blockheader[20];
-
-
 
 __device__ uint32_t __Reverse32(uint32_t value)
 {

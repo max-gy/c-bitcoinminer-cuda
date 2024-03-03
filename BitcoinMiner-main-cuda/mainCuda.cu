@@ -16,8 +16,8 @@
 #include <ctype.h>
 #include <chrono>
 
-#include "/usr/local/cuda-11.4/targets/aarch64-linux/include/cuda_runtime.h"
-#include "/usr/local/cuda-11.4/targets/aarch64-linux/include/device_launch_parameters.h"
+#include "/usr/local/cuda-11/targets/aarch64-linux/include/cuda_runtime.h"
+#include "/usr/local/cuda-11/targets/aarch64-linux/include/device_launch_parameters.h"
 
 
 __global__ void sha256_cuda_try(char* a, char* b) {
@@ -124,29 +124,26 @@ __global__ void sha256_cuda_hash(uint32_t* result_H) {
 	return;
 }
 
-__global__ void sha256_cuda_hash_full(uint32_t* result_H) {
+__global__ void sha256_cuda_hash_full(uint64_t * nonce_found) {
 
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
+	//int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+
+    //calculates unique thread ID in the block
+    int t= (blockDim.x*blockDim.y)*threadIdx.z
+		   +(threadIdx.y*blockDim.x)+(threadIdx.x);
+	//calculates unique block ID in the grid
+    int b= (gridDim.x*gridDim.y)*blockIdx.z
+		   +(blockIdx.y*gridDim.x)+(blockIdx.x);
+	//block size (this is redundant though) 
+	int T= blockDim.x*blockDim.y*blockDim.z;
+	//grid size (this is redundant though)
+	int B= gridDim.x*gridDim.y*gridDim.z;
+	
+
+	int index= b * T + t;
 
 	uint32_t H_0[8] = { 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 };
-
-    uint32_t K[64] = {0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
-    0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
-    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-    0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
-    0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
-    0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
-	
 
 	//result_H[index] = index;
 
@@ -252,7 +249,7 @@ __global__ void sha256_cuda_hash_full(uint32_t* result_H) {
 					W[j] = sig1(W[j-2]) + W[j-7] + sig0(W[j-15]) + W[j-16];
 				
 				
-				uint32_t T1 = h + Sig1 + ch + K[j] + W[j];
+				uint32_t T1 = h + Sig1 + ch + dev_K[j] + W[j];
 				uint32_t T2 = Sig0 + maj;
 				h = g;
 				g = f;
@@ -284,29 +281,22 @@ __global__ void sha256_cuda_hash_full(uint32_t* result_H) {
 		
 	}
 
-	int solved = 0;
+	nonce_found[0] = 0;
+	bool solved = false;
 	for(int i = 0; i < 8; i++)
 	{
 		if(outputlocation[7-i] < dev_difficulty[i])
 		{
-			solved = 1;
-
+			solved = true;
+			nonce_found[0] = index;
 		}
 		else if(outputlocation[7-i] > dev_difficulty[i])
 			break;
 		// And if they're equal, we keep going!
 	}
-	
-	result_H[index] = solved;
+	nonce_found[0] = index;
+//	result_H[index] = solved;
 
-	    //for(int i = 0; i < 8; i++)
-       // outputlocation[i] = H[rounds][i];
-
-	
-    /*std::cout << "\n Run hash input\n";
-	for (int y=0;y<32;y++) 
-        for (int z=0;z<8;z++) 
-			std::cout << H[y][z] << " "; */
 	return;
 
  
@@ -318,6 +308,25 @@ void __hashblock(uint32_t _nonce, char* version, char* prevhash,
 {
 
 
+    uint32_t K[64] = {0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+		0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+		0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+		0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+		0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+		0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+		0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+		0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+		0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+		0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+		0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+		0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+		
+	
+
 	uint32_t nonce[1];
 	nonce[0] = _nonce;
 
@@ -325,6 +334,9 @@ void __hashblock(uint32_t _nonce, char* version, char* prevhash,
     uint32_t bits[1];
     hexstr_to_intarray(nbits, bits);
     bits_to_difficulty(*bits, difficulty);
+
+	checkCudaErrors(cudaMemcpyToSymbol(dev_K, K, sizeof(K), 0, cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpyToSymbol(dev_difficulty, difficulty, sizeof(difficulty), 0, cudaMemcpyHostToDevice));
 
 	int solved = 0;
 	while (!solved) {
@@ -338,38 +350,41 @@ void __hashblock(uint32_t _nonce, char* version, char* prevhash,
 		hexstr_to_intarray(nbits, blockheader + 18);
 		*(blockheader + 19) = nonce[0];
 
-		uint32_t * cuda_result_nonce = 0;
-		uint32_t result_nonce[1024*1024];
-		for (int bi = 0;bi<1024*1024;bi++) result_nonce[bi] = 0;
+		const uint64_t SIZE_BUFFER = 1024*1024;
+		uint64_t * cuda_result_nonce_1 = 0;
+		uint64_t * cuda_result_nonce_2 = 0;
 
-		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+		uint64_t result_nonce[1];
+
 
 		checkCudaErrors(cudaMemcpyToSymbol(dev_nonce, nonce, sizeof(nonce), 0, cudaMemcpyHostToDevice));
 		checkCudaErrors(cudaMemcpyToSymbol(dev_blockheader, blockheader, sizeof(blockheader), 0, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpyToSymbol(dev_difficulty, difficulty, sizeof(difficulty), 0, cudaMemcpyHostToDevice));
+
+		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
 
-		cudaMalloc(&cuda_result_nonce, sizeof(result_nonce));
+		cudaMalloc(&cuda_result_nonce_1, sizeof(result_nonce));
+
+		sha256_cuda_hash_full <<< 1024, 1024 >>> (cuda_result_nonce_1);
+
+		//cudaMalloc(&cuda_result_nonce_2, sizeof(result_nonce));
+
+		//sha256_cuda_hash_full <<< (64,64,64), 1024 >>> (cuda_result_nonce_2);
 
 		
+		cudaMemcpy(result_nonce,cuda_result_nonce_1,sizeof(result_nonce),cudaMemcpyDeviceToHost); 
 
-		sha256_cuda_hash_full <<< 1024, 1024 >>> (cuda_result_nonce);
-
-		cudaMemcpy(result_nonce,cuda_result_nonce,sizeof(result_nonce),cudaMemcpyDeviceToHost); 
+		nonce[0]+=result_nonce[0];
 
 		std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-		long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-		float hashrate = 1024*1024*1000 / (float)duration;
-		std::cout << "Currently mining at " << hashrate << " hashes / second" << std::endl;
-
-
+		uint64_t duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+		uint64_t hashrate = result_nonce[0] / ((uint64_t)duration);
+		std::cout << "Currently mining at " << hashrate << "000 hashes / second" << std::endl;
+			
 		
 		std::cout << "finished cuda \n";
-		for (int bi = 0;bi<1024*1024;bi++) {
-			nonce[0]++;
-			if (result_nonce[bi] == 1) solved = 1;
-		};
-
+		std::cout << result_nonce[0] << " ";// << nonce[0] << "\n";
+		
 
 	}
 
