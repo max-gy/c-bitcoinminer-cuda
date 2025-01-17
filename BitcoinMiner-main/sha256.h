@@ -1,1 +1,0 @@
-int hash(uint32_t *input, int bitlength, uint32_t *outputlocation);
