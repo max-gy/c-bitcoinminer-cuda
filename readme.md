@@ -2,7 +2,7 @@
 
 based on bitcoin miner from MattyAB https://github.com/MattyAB
 
-but modified to run with CUDO on a nvidia xavier
+but modified to run with CUDA on a nvidia xavier
 
 for compiling I used nvcc like so
 
